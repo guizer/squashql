@@ -4,11 +4,13 @@ import io.squashql.PrefetchVisitor;
 import io.squashql.query.QueryCache.SubQueryScope;
 import io.squashql.query.QueryCache.TableScope;
 import io.squashql.query.context.QueryCacheContextValue;
+import io.squashql.query.database.AQueryEngine;
 import io.squashql.query.database.DatabaseQuery;
 import io.squashql.query.database.QueryEngine;
 import io.squashql.query.dto.*;
 import io.squashql.query.monitoring.QueryWatch;
 import io.squashql.store.Field;
+import io.squashql.store.Store;
 import io.squashql.table.MergeTables;
 import io.squashql.util.Queries;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +28,7 @@ import static io.squashql.query.ColumnSetKey.BUCKET;
 @Slf4j
 public class QueryExecutor {
 
-  public static final int LIMIT_DEFAULT_VALUE = Integer.valueOf(System.getProperty("query.limit", Integer.toString(10_000)));
+  public static final int LIMIT_DEFAULT_VALUE = Integer.parseInt(System.getProperty("query.limit", Integer.toString(10_000)));
   public final QueryEngine<?> queryEngine;
   public final QueryCache queryCache;
 
@@ -44,7 +46,7 @@ public class QueryExecutor {
       case USE -> this.queryCache;
       case NOT_USE -> EmptyQueryCache.INSTANCE;
       case INVALIDATE -> {
-        this.queryCache.clear();
+        this.queryCache.clear(); // FIXME this should be user based.
         yield this.queryCache;
       }
     };
@@ -77,7 +79,7 @@ public class QueryExecutor {
     queryWatch.stop(QueryWatch.PREPARE_RESOLVE_MEASURES);
 
     queryWatch.start(QueryWatch.EXECUTE_PREFETCH_PLAN);
-    Function<String, Field> fieldSupplier = this.queryEngine.getFieldSupplier();
+    Function<String, Field> fieldSupplier = createQueryFieldSupplier(this.queryEngine, query.virtualTableDto);
     QueryScope queryScope = createQueryScope(query, fieldSupplier);
     Pair<DependencyGraph<QueryPlanNodeKey>, DependencyGraph<QueryScope>> dependencyGraph = computeDependencyGraph(query, queryScope, fieldSupplier);
     // Compute what needs to be prefetched
@@ -205,9 +207,9 @@ public class QueryExecutor {
     // If column set, it changes the scope
     List<Field> columns = Stream.concat(
             query.columnSets.values().stream().flatMap(cs -> cs.getColumnsForPrefetching().stream()),
-            query.columns.stream()).map(fieldSupplier).toList();
+            query.columns.stream()).map(fieldSupplier).collect(Collectors.toCollection(ArrayList::new));
     List<Field> rollupColumns = query.rollupColumns.stream().map(fieldSupplier).toList();
-    return new QueryScope(query.table, query.subQuery, columns, query.whereCriteriaDto, query.havingCriteriaDto, rollupColumns);
+    return new QueryScope(query.table, query.subQuery, columns, query.whereCriteriaDto, query.havingCriteriaDto, rollupColumns, query.virtualTableDto);
   }
 
   private static QueryCache.PrefetchQueryScope createPrefetchQueryScope(
@@ -216,9 +218,21 @@ public class QueryExecutor {
           SquashQLUser user) {
     Set<Field> fields = new HashSet<>(prefetchQuery.select);
     if (queryScope.tableDto != null) {
-      return new TableScope(queryScope.tableDto, fields, queryScope.whereCriteriaDto, queryScope.havingCriteriaDto, queryScope.rollupColumns, user, prefetchQuery.limit);
+      return new TableScope(queryScope.tableDto,
+              fields,
+              queryScope.whereCriteriaDto,
+              queryScope.havingCriteriaDto,
+              queryScope.rollupColumns,
+              queryScope.virtualTableDto,
+              user,
+              prefetchQuery.limit);
     } else {
-      return new SubQueryScope(queryScope.subQuery, fields, queryScope.whereCriteriaDto, queryScope.havingCriteriaDto, user, prefetchQuery.limit);
+      return new SubQueryScope(queryScope.subQuery,
+              fields,
+              queryScope.whereCriteriaDto,
+              queryScope.havingCriteriaDto,
+              user,
+              prefetchQuery.limit);
     }
   }
 
@@ -227,7 +241,8 @@ public class QueryExecutor {
                            List<Field> columns,
                            CriteriaDto whereCriteriaDto,
                            CriteriaDto havingCriteriaDto,
-                           List<Field> rollupColumns) {
+                           List<Field> rollupColumns,
+                           VirtualTableDto virtualTableDto) {
   }
 
   public record QueryPlanNodeKey(QueryScope queryScope, Measure measure) {
@@ -244,7 +259,7 @@ public class QueryExecutor {
     // Deactivate for now.
   }
 
-  public Table execute(QueryDto first, QueryDto second, SquashQLUser user) {
+  public Table execute(QueryDto first, QueryDto second, JoinType joinType, SquashQLUser user) {
     Map<String, Comparator<?>> firstComparators = Queries.getComparators(first);
     Map<String, Comparator<?>> secondComparators = Queries.getComparators(second);
     secondComparators.putAll(firstComparators); // the comparators of the first query take precedence over the second's
@@ -260,27 +275,20 @@ public class QueryExecutor {
             false);
     CompletableFuture<Table> f1 = CompletableFuture.supplyAsync(() -> execute.apply(first));
     CompletableFuture<Table> f2 = CompletableFuture.supplyAsync(() -> execute.apply(second));
-    return CompletableFuture.allOf(f1, f2).thenApply(__ -> merge(f1.join(), f2.join(), secondComparators, columnSets)).join();
+    return CompletableFuture.allOf(f1, f2).thenApply(__ -> merge(f1.join(), f2.join(), joinType, secondComparators, columnSets)).join();
   }
 
-  public static Table merge(Table table1, Table table2, Map<String, Comparator<?>> comparators, Set<ColumnSet> columnSets) {
-    ColumnarTable table = (ColumnarTable) MergeTables.mergeTables(table1, table2);
+  public static Table merge(Table table1, Table table2, JoinType joinType, Map<String, Comparator<?>> comparators, Set<ColumnSet> columnSets) {
+    ColumnarTable table = (ColumnarTable) MergeTables.mergeTables(table1, table2, joinType);
     table = (ColumnarTable) TableUtils.orderRows(table, comparators, columnSets);
     return TableUtils.replaceTotalCellValues(table, true);
   }
 
-  public static Function<String, Field> withFallback(Function<String, Field> fieldProvider, Class<?> fallbackType) {
-    return fieldName -> {
-      Field f;
-      try {
-        f = fieldProvider.apply(fieldName);
-      } catch (Exception e) {
-        // This can happen if the using a "field" coming from the calculation of a subquery. Since the field provider
-        // contains only "raw" fields, it will throw an exception.
-        log.info("Cannot find field " + fieldName + " with default field provider, fallback to default type: " + fallbackType.getSimpleName());
-        f = new Field(null, fieldName, Number.class);
-      }
-      return f;
-    };
+  public static Function<String, Field> createQueryFieldSupplier(QueryEngine<?> queryEngine, VirtualTableDto vt) {
+    Map<String, Store> storesByName = new HashMap<>(queryEngine.datastore().storesByName());
+    if (vt != null) {
+      storesByName.put(vt.name, VirtualTableDto.toStore(vt));
+    }
+    return AQueryEngine.createFieldSupplier(storesByName);
   }
 }

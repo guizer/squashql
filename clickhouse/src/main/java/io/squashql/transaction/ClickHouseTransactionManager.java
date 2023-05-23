@@ -1,6 +1,5 @@
 package io.squashql.transaction;
 
-import com.clickhouse.client.*;
 import com.clickhouse.jdbc.ClickHouseConnection;
 import com.clickhouse.jdbc.ClickHouseDataSource;
 import com.clickhouse.jdbc.ClickHouseStatement;
@@ -10,9 +9,8 @@ import org.eclipse.collections.impl.list.immutable.ImmutableListFactoryImpl;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.IntStream;
 
 import static io.squashql.ClickHouseUtil.classToClickHouseType;
@@ -94,20 +92,16 @@ public class ClickHouseTransactionManager implements TransactionManager {
 
   @Override
   public void loadCsv(String scenario, String store, String path, String delimiter, boolean header) {
-    ClickHouseNode clickHouseNode = ClickHouseNode.of(this.clickHouseDataSource.getHost(),
-            ClickHouseProtocol.HTTP,
-            this.clickHouseDataSource.getPort(),
-            null);
+    throw new RuntimeException("not implemented");
+  }
 
-    try {
-      CompletableFuture<ClickHouseResponseSummary> load = ClickHouseClient.load(
-              clickHouseNode,
-              store,
-              header ? ClickHouseFormat.CSVWithNames : ClickHouseFormat.CSV,
-              ClickHouseCompression.LZ4,
-              path);
-      load.get();
-    } catch (InterruptedException | ExecutionException e) {
+  public void dropTables(Collection<String> tables) {
+    try (ClickHouseConnection conn = this.clickHouseDataSource.getConnection();
+         ClickHouseStatement stmt = conn.createStatement()) {
+      for (String table : tables) {
+        stmt.execute("drop table if exists " + table);
+      }
+    } catch (SQLException e) {
       throw new RuntimeException(e);
     }
   }

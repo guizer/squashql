@@ -58,7 +58,7 @@ public interface Table extends Iterable<List<Object>> {
       i++;
     }
     if (index < 0) {
-      throw new IllegalArgumentException("no column named " + column);
+      throw new IllegalArgumentException("no column named " + column + ". Available columns are " + headers().stream().map(Header::name).toList());
     }
     return index;
   }
@@ -81,25 +81,6 @@ public interface Table extends Iterable<List<Object>> {
       throw new IllegalArgumentException("no header named " + header);
     }
     return index;
-  }
-
-  /**
-   * Retrieve the column values for a given row index.
-   *
-   * @param rowIndex the index of the row to retrieve
-   * @return the list of column values for this row or null if the rowIndex is outside the table
-   */
-  default List<Object> getFactRow(int rowIndex) {
-    if (rowIndex >= count()) {
-      return null;
-    }
-    List<Object> result = new ArrayList<>();
-    headers().forEach(header -> {
-      if (!header.isMeasure()) {
-        result.add(getColumnValues(header.name()).get(rowIndex));
-      }
-    });
-    return result;
   }
 
   /**

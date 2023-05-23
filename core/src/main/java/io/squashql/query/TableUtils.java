@@ -138,25 +138,25 @@ public class TableUtils {
     return new ColumnarTable(headers, new HashSet<>(measures), values);
   }
 
+  /**
+   * Naturally order the rows from left to right.
+   */
+  public static Table orderRows(ColumnarTable table) {
+    return orderRows(table, Collections.emptyMap(), Collections.emptySet());
+  }
+
   public static Table orderRows(ColumnarTable table,
                                 Map<String, Comparator<?>> comparatorByColumnName,
                                 Collection<ColumnSet> columnSets) {
     List<List<?>> args = new ArrayList<>();
     List<Comparator<?>> comparators = new ArrayList<>();
 
-    boolean hasComparatorOnMeasure = false;
     List<Header> headers = table.headers;
-    for (Header header : headers) {
-      if (header.isMeasure()) {
-        hasComparatorOnMeasure |= comparatorByColumnName.containsKey(header.name());
-      }
-    }
-
     for (int i = 0; i < headers.size(); i++) {
       String headerName = headers.get(i).name();
       Comparator<?> queryComp = comparatorByColumnName.get(headerName);
-      // Order a column even if not explicitly asked in the query only if no comparator on any measure
-      if (queryComp != null || (!headers.get(i).isMeasure() && !hasComparatorOnMeasure)) {
+      // Order by default if not explicitly asked in the query. Otherwise, respect the order.
+      if (queryComp != null || comparatorByColumnName.isEmpty()) {
         args.add(table.getColumnValues(headerName));
         // Always order table. If not defined, use natural order comp.
         comparators.add(queryComp == null ? NullAndTotalComparator.nullsLastAndTotalsFirst(Comparator.naturalOrder())

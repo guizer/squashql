@@ -128,7 +128,7 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
   }
 
   /**
-   * subcategory is null for some rows. The engine needs to be capable of distinguish null values that are returned by
+   * Subcategory is null for some rows. The engine needs to be capable of distinguish null values that are returned by
    * ROLLUP from standard null values.
    */
   @Test
@@ -369,7 +369,7 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
             qr.fieldName("category"),
             qr.fieldName("category"),
             qr.fieldName("quantity"));
-    ConditionDto or = eq("food").or(eq("drink"));
+    ConditionDto or = or(eq("food"), eq("drink"));
     QueryDto query = Query
             .from(this.storeName)
             .select(List.of(SCENARIO_FIELD_NAME),
@@ -400,7 +400,7 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
 
   @Test
   void testSumIfWithFullPath() {
-    ConditionDto or = eq("food").or(eq("drink"));
+    ConditionDto or = or(eq("food"), eq("drink"));
     QueryDto query = Query
             .from(this.storeName)
             .select(List.of(SCENARIO_FIELD_NAME),
@@ -433,13 +433,15 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
 
     query.orderBy("category", OrderKeywordDto.DESC);
     result = this.executor.execute(query);
-    Assertions.assertThat(result).containsExactly(
-            List.of(MAIN_SCENARIO_NAME, "drink", 1l),
-            List.of(MAIN_SCENARIO_NAME, "cloth", 1l),
-            List.of("s1", "drink", 1l),
-            List.of("s1", "cloth", 1l),
-            List.of("s2", "drink", 1l),
-            List.of("s2", "cloth", 1l));
+    // The order is enforced by the user on category, but we can't know the order of the scenario column, this is why
+    // only the category column is checked
+    Assertions.assertThat(result.getColumnValues("category")).containsExactly(
+            "drink",
+            "drink",
+            "drink",
+            "cloth",
+            "cloth",
+            "cloth");
 
     List<String> elements = List.of("s2", MAIN_SCENARIO_NAME, "s1");
     query.orderBy(SCENARIO_FIELD_NAME, elements);
@@ -526,7 +528,7 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
             List.of("drink", 7.5d),
             List.of("food", 9d));
 
-    query.orderBy(result.getHeader(sum("p", "price")).name(), OrderKeywordDto.DESC);
+    query.orderBy("p", OrderKeywordDto.DESC);
     result = this.executor.execute(query);
     Assertions.assertThat(result).containsExactly(
             List.of("cloth", 30d),
@@ -586,7 +588,7 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
             .rollup(List.of("category", SCENARIO_FIELD_NAME))
             .build();
 
-    Table result = this.executor.execute(query1, query2, null);
+    Table result = this.executor.execute(query1, query2, JoinType.FULL, null);
 
     Assertions.assertThat(result.headers().stream().map(Header::name).toList())
             .containsExactly("category", SCENARIO_FIELD_NAME, "p_sum", "p_min");
@@ -623,7 +625,7 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
             .orderBy(SCENARIO_FIELD_NAME, List.of("s1", MAIN_SCENARIO_NAME, "s2"))
             .build();
 
-    Table result = this.executor.execute(query1, query2, null);
+    Table result = this.executor.execute(query1, query2, JoinType.FULL, null);
     Assertions.assertThat(result).containsExactly(
             Arrays.asList(GRAND_TOTAL, GRAND_TOTAL, 46.5d, 1.5d),
             Arrays.asList("food", TOTAL, 9d, 3d),
@@ -675,7 +677,7 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
             .select_(List.of(group2), List.of(avg("p_avg", "price")))
             .build();
 
-    Table result = this.executor.execute(query1, query2, null);
+    Table result = this.executor.execute(query1, query2, JoinType.FULL, null);
     Assertions.assertThat(result).containsExactly(
             Arrays.asList("Food & Drink", "food", TOTAL, TOTAL, 9d, null),
             Arrays.asList("Food & Drink", "drink", TOTAL, TOTAL, 7.5d, null),

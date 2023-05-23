@@ -27,6 +27,7 @@ public class TestClickHouseQueryWithJoins extends ATestQueryWithJoins {
   @AfterAll
   void tearDown() {
     // we do not stop the container to be able to reuse it between tests.
+    ((ClickHouseTransactionManager) this.tm).dropTables(this.fieldsByStore.keySet());
   }
 
   @Override
@@ -42,16 +43,11 @@ public class TestClickHouseQueryWithJoins extends ATestQueryWithJoins {
 
   @Override
   protected Datastore createDatastore() {
-    return new ClickHouseDatastore(TestUtils.jdbcUrl.apply(this.container), null);
+    return new ClickHouseDatastore(TestUtils.jdbcUrl.apply(this.container));
   }
 
   @Override
   protected TransactionManager createTransactionManager() {
     return new ClickHouseTransactionManager(((ClickHouseDatastore) this.datastore).dataSource);
-  }
-
-  @Override
-  protected String ambiguousNameMessage() {
-    return "Ambiguous column 'name'";
   }
 }

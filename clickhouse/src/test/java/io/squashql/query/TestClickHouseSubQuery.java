@@ -27,6 +27,7 @@ public class TestClickHouseSubQuery extends ATestSubQuery {
   @AfterAll
   void tearDown() {
     // we do not stop the container to be able to reuse it between tests.
+    ((ClickHouseTransactionManager) this.tm).dropTables(this.fieldsByStore.keySet());
   }
 
   @Override
@@ -42,7 +43,7 @@ public class TestClickHouseSubQuery extends ATestSubQuery {
 
   @Override
   protected Datastore createDatastore() {
-    return new ClickHouseDatastore(TestUtils.jdbcUrl.apply(this.container), null);
+    return new ClickHouseDatastore(TestUtils.jdbcUrl.apply(this.container));
   }
 
   @Override

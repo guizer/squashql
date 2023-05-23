@@ -9,6 +9,9 @@
   <a>
     <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/m/squashql/squashql">
   </a>
+  <a>
+    <img alt="Discord chat" src="https://img.shields.io/discord/1051535068637700196?label=discord">
+  </a> 
 </p>
 
 ---
@@ -30,7 +33,9 @@ You can try SquashQL directly from your web browser with [our showcase project](
 
 ## Compatibility
 
-SquashQL is currently compatible with the following SQL databases: [Apache Spark](https://spark.apache.org/), [ClickHouse](https://clickhouse.com/), [BigQuery](https://cloud.google.com/bigquery/) and [Snowflake](https://www.snowflake.com/en/). 
+SquashQL is currently compatible with the following SQL databases: [Apache Spark](https://spark.apache.org/), 
+[ClickHouse](https://clickhouse.com/), [BigQuery](https://cloud.google.com/bigquery/), [Snowflake](https://www.snowflake.com/en/) 
+and [DuckDB](https://duckdb.org/). 
 
 ## API
 
@@ -92,6 +97,19 @@ const serverUrl = "http://localhost:8080";
 const querier = new Querier(serverUrl, axiosConfig)
 ```
 
+### Under the hood
+
+SquashQL helps you executing multi-dimensional queries compatible with several databases. The syntax is closed to SQL but... 
+
+> What happens exactly when the query is sent to SquashQL?
+
+Once the query is received by SquashQL server, it is analyzed and broken down into one or multiple *elementary* 
+queries that can be executed by the underlying database. Before sending those queries for execution, SquashQL first looks
+into its query cache (see [CaffeineQueryCache](https://github.com/squashql/squashql/blob/main/core/src/main/java/io/squashql/query/CaffeineQueryCache.java))
+to see if the result of each *elementary* query exist. If it does, the result is returned immediately. If it does not, 
+the elementary query is translated into compatible SQL statement, sent and executed by the database. 
+The intermediary results are cached into SquashQL query cache for future reuse and used to compute the final query result. 
+
 ### Configuration
 
 To connect SquashQL to your database you will first have to import the associated maven module and defined in your 
@@ -99,6 +117,23 @@ java project a `QueryEngine` and `Datasatore` by picking the correct implementat
 the `QueryEngine` instance.
 
 Find a ready-to-use example with Apache Spark and Spring Boot [here](https://github.com/squashql/squashql-showcase).
+
+#### DuckDB
+
+Maven
+```xml
+<dependency>
+  <groupId>io.squashql</groupId>
+  <artifactId>squashql-duckdb</artifactId>
+  <version>${squashql.version}</version>
+</dependency>
+```
+
+Java
+```
+DuckDBDatastore ds = new DuckDBDatastore();
+DuckDBQueryEngine qe = new DuckDBQueryEngine(ds);
+```
 
 #### Apache Spark
 
@@ -132,8 +167,7 @@ Maven
 Java
 ```
 String jdbcUrl = ...; // to be defined
-String databaseName = ...;// to be defined
-ClickHouseDatastore ds = new ClickHouseDatastore(jdbcUrl, databaseName);
+ClickHouseDatastore ds = new ClickHouseDatastore(jdbcUrl);
 ClickHouseQueryEngine qe = new ClickHouseQueryEngine(ds);
 ```
 

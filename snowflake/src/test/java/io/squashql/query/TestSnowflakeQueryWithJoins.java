@@ -49,9 +49,4 @@ public class TestSnowflakeQueryWithJoins extends ATestQueryWithJoins {
   protected Object translate(Object o) {
     return SnowflakeTestUtil.translate(o);
   }
-
-  @Override
-  protected String ambiguousNameMessage() {
-    return "ambiguous column name 'name'";
-  }
 }

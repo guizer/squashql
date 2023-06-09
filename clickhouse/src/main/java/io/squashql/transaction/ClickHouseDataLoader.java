@@ -15,11 +15,11 @@ import java.util.stream.IntStream;
 
 import static io.squashql.ClickHouseUtil.classToClickHouseType;
 
-public class ClickHouseTransactionManager implements TransactionManager {
+public class ClickHouseDataLoader implements DataLoader {
 
   protected final ClickHouseDataSource clickHouseDataSource;
 
-  public ClickHouseTransactionManager(ClickHouseDataSource clickHouseDataSource) {
+  public ClickHouseDataLoader(ClickHouseDataSource clickHouseDataSource) {
     this.clickHouseDataSource = clickHouseDataSource;
   }
 
@@ -61,11 +61,11 @@ public class ClickHouseTransactionManager implements TransactionManager {
   }
 
   @Override
-  public void load(String scenario, String store, List<Object[]> tuples) {
+  public void load(String scenario, String table, List<Object[]> tuples) {
     // Check the table contains a column scenario.
-    ensureScenarioColumnIsPresent(store);
+    ensureScenarioColumnIsPresent(table);
     String join = String.join(",", IntStream.range(0, tuples.get(0).length + 1).mapToObj(i -> "?").toList());
-    String pattern = "insert into " + store + " values(" + join + ")";
+    String pattern = "insert into " + table + " values(" + join + ")";
     try (ClickHouseConnection conn = this.clickHouseDataSource.getConnection();
          PreparedStatement stmt = conn.prepareStatement(pattern)) {
 
@@ -91,7 +91,7 @@ public class ClickHouseTransactionManager implements TransactionManager {
   }
 
   @Override
-  public void loadCsv(String scenario, String store, String path, String delimiter, boolean header) {
+  public void loadCsv(String scenario, String table, String path, String delimiter, boolean header) {
     throw new RuntimeException("not implemented");
   }
 

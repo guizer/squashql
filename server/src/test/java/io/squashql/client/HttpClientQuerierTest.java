@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import static io.squashql.transaction.TransactionManager.MAIN_SCENARIO_NAME;
-import static io.squashql.transaction.TransactionManager.SCENARIO_FIELD_NAME;
+import static io.squashql.transaction.DataLoader.MAIN_SCENARIO_NAME;
+import static io.squashql.transaction.DataLoader.SCENARIO_FIELD_NAME;
 
 @SpringBootTest(
         classes = SquashQLApplication.class,
@@ -54,7 +54,7 @@ public class HttpClientQuerierTest {
     QueryDto query = new QueryDto()
             .table("our_prices")
             .withColumn(SCENARIO_FIELD_NAME)
-            .aggregatedMeasure("qs", "quantity", "sum");
+            .withMeasure(new AggregatedMeasure("qs", "quantity", "sum"));
 
     QueryResultDto response = querier.run(query);
     assertQuery(response.table);
@@ -73,11 +73,11 @@ public class HttpClientQuerierTest {
     QueryDto query1 = new QueryDto()
             .table("our_prices")
             .withColumn(SCENARIO_FIELD_NAME)
-            .aggregatedMeasure("qs", "quantity", "sum");
+            .withMeasure(new AggregatedMeasure("qs", "quantity", "sum"));
     QueryDto query2 = new QueryDto()
             .table("our_prices")
             .withColumn(SCENARIO_FIELD_NAME)
-            .aggregatedMeasure("qa", "quantity", "avg");
+            .withMeasure(new AggregatedMeasure(("qa"), "quantity", "avg"));
 
     QueryResultDto response = querier.queryMerge(new QueryMergeDto(query1, query2, JoinType.FULL));
     Assertions.assertThat(response.table.rows).containsExactlyInAnyOrder(List.of("MDD up", 4000, 1000d),

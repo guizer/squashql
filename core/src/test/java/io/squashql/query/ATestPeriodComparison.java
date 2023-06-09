@@ -4,7 +4,7 @@ import io.squashql.TestClass;
 import io.squashql.query.builder.Query;
 import io.squashql.query.dto.Period;
 import io.squashql.store.Field;
-import io.squashql.transaction.TransactionManager;
+import io.squashql.transaction.DataLoader;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -21,10 +21,10 @@ import static io.squashql.query.Functions.criterion;
 import static io.squashql.query.Functions.eq;
 import static io.squashql.query.database.QueryEngine.GRAND_TOTAL;
 import static io.squashql.query.database.QueryEngine.TOTAL;
-import static io.squashql.transaction.TransactionManager.MAIN_SCENARIO_NAME;
-import static io.squashql.transaction.TransactionManager.SCENARIO_FIELD_NAME;
+import static io.squashql.transaction.DataLoader.MAIN_SCENARIO_NAME;
+import static io.squashql.transaction.DataLoader.SCENARIO_FIELD_NAME;
 
-@TestClass(ignore = {TestClass.Type.SPARK})
+@TestClass
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public abstract class ATestPeriodComparison extends ABaseTestQuery {
@@ -49,36 +49,36 @@ public abstract class ATestPeriodComparison extends ABaseTestQuery {
   protected void loadData() {
     this.tm.load(MAIN_SCENARIO_NAME, this.storeName, List.of(
             // 2022
-            new Object[]{"bottle", "drink", 20d, 10, 2022, 1, 1, 1, LocalDate.of(2022, 1, 1)},
-            new Object[]{"bottle", "drink", 10d, 5, 2022, 1, 2, 4, LocalDate.of(2022, 4, 1)},
-            new Object[]{"bottle", "drink", 20d, 10, 2022, 2, 3, 8, LocalDate.of(2022, 8, 1)},
-            new Object[]{"bottle", "drink", 10d, 5, 2022, 2, 4, 12, LocalDate.of(2022, 12, 1)},
+            new Object[]{"bottle", "drink", 20d, 10l, 2022l, 1, 1, 1, LocalDate.of(2022, 1, 1)},
+            new Object[]{"bottle", "drink", 10d, 5l, 2022l, 1, 2, 4, LocalDate.of(2022, 4, 1)},
+            new Object[]{"bottle", "drink", 20d, 10l, 2022l, 2, 3, 8, LocalDate.of(2022, 8, 1)},
+            new Object[]{"bottle", "drink", 10d, 5l, 2022l, 2, 4, 12, LocalDate.of(2022, 12, 1)},
 
-            new Object[]{"cookie", "food", 60d, 20, 2022, 1, 1, 2, LocalDate.of(2022, 2, 1)},
-            new Object[]{"cookie", "food", 30d, 10, 2022, 1, 2, 5, LocalDate.of(2022, 5, 1)},
-            new Object[]{"cookie", "food", 15d, 5, 2022, 2, 3, 9, LocalDate.of(2022, 9, 1)},
-            new Object[]{"cookie", "food", 15d, 5, 2022, 2, 4, 11, LocalDate.of(2022, 11, 1)},
+            new Object[]{"cookie", "food", 60d, 20l, 2022l, 1, 1, 2, LocalDate.of(2022, 2, 1)},
+            new Object[]{"cookie", "food", 30d, 10l, 2022l, 1, 2, 5, LocalDate.of(2022, 5, 1)},
+            new Object[]{"cookie", "food", 15d, 5l, 2022l, 2, 3, 9, LocalDate.of(2022, 9, 1)},
+            new Object[]{"cookie", "food", 15d, 5l, 2022l, 2, 4, 11, LocalDate.of(2022, 11, 1)},
 
-            new Object[]{"shirt", "cloth", 20d, 2, 2022, 1, 1, 3, LocalDate.of(2022, 3, 1)},
-            new Object[]{"shirt", "cloth", 40d, 4, 2022, 1, 2, 6, LocalDate.of(2022, 6, 1)},
-            new Object[]{"shirt", "cloth", 50d, 5, 2022, 2, 3, 7, LocalDate.of(2022, 7, 1)},
-            new Object[]{"shirt", "cloth", 10d, 1, 2022, 2, 4, 10, LocalDate.of(2022, 10, 1)},
+            new Object[]{"shirt", "cloth", 20d, 2l, 2022l, 1, 1, 3, LocalDate.of(2022, 3, 1)},
+            new Object[]{"shirt", "cloth", 40d, 4l, 2022l, 1, 2, 6, LocalDate.of(2022, 6, 1)},
+            new Object[]{"shirt", "cloth", 50d, 5l, 2022l, 2, 3, 7, LocalDate.of(2022, 7, 1)},
+            new Object[]{"shirt", "cloth", 10d, 1l, 2022l, 2, 4, 10, LocalDate.of(2022, 10, 1)},
 
             // 2023 (same data but 2023)
-            new Object[]{"bottle", "drink", 20d, 10, 2023, 1, 1, 1, LocalDate.of(2023, 1, 1)},
-            new Object[]{"bottle", "drink", 10d, 5, 2023, 1, 2, 4, LocalDate.of(2023, 4, 1)},
-            new Object[]{"bottle", "drink", 20d, 10, 2023, 2, 3, 8, LocalDate.of(2023, 8, 1)},
-            new Object[]{"bottle", "drink", 10d, 5, 2023, 2, 4, 12, LocalDate.of(2023, 12, 1)},
+            new Object[]{"bottle", "drink", 20d, 10l, 2023l, 1, 1, 1, LocalDate.of(2023, 1, 1)},
+            new Object[]{"bottle", "drink", 10d, 5l, 2023l, 1, 2, 4, LocalDate.of(2023, 4, 1)},
+            new Object[]{"bottle", "drink", 20d, 10l, 2023l, 2, 3, 8, LocalDate.of(2023, 8, 1)},
+            new Object[]{"bottle", "drink", 10d, 5l, 2023l, 2, 4, 12, LocalDate.of(2023, 12, 1)},
 
-            new Object[]{"cookie", "food", 60d, 20, 2023, 1, 1, 2, LocalDate.of(2023, 2, 1)},
-            new Object[]{"cookie", "food", 30d, 10, 2023, 1, 2, 5, LocalDate.of(2023, 5, 1)},
-            new Object[]{"cookie", "food", 15d, 5, 2023, 2, 3, 9, LocalDate.of(2023, 9, 1)},
-            new Object[]{"cookie", "food", 15d, 5, 2023, 2, 4, 11, LocalDate.of(2023, 11, 1)},
+            new Object[]{"cookie", "food", 60d, 20l, 2023l, 1, 1, 2, LocalDate.of(2023, 2, 1)},
+            new Object[]{"cookie", "food", 30d, 10l, 2023l, 1, 2, 5, LocalDate.of(2023, 5, 1)},
+            new Object[]{"cookie", "food", 15d, 5l, 2023l, 2, 3, 9, LocalDate.of(2023, 9, 1)},
+            new Object[]{"cookie", "food", 15d, 5l, 2023l, 2, 4, 11, LocalDate.of(2023, 11, 1)},
 
-            new Object[]{"shirt", "cloth", 20d, 2, 2023, 1, 1, 3, LocalDate.of(2023, 3, 1)},
-            new Object[]{"shirt", "cloth", 40d, 4, 2023, 1, 2, 6, LocalDate.of(2023, 6, 1)},
-            new Object[]{"shirt", "cloth", 50d, 5, 2023, 2, 3, 7, LocalDate.of(2023, 7, 1)},
-            new Object[]{"shirt", "cloth", 10d, 1, 2023, 2, 4, 10, LocalDate.of(2023, 10, 1)}
+            new Object[]{"shirt", "cloth", 20d, 2l, 2023l, 1, 1, 3, LocalDate.of(2023, 3, 1)},
+            new Object[]{"shirt", "cloth", 40d, 4l, 2023l, 1, 2, 6, LocalDate.of(2023, 6, 1)},
+            new Object[]{"shirt", "cloth", 50d, 5l, 2023l, 2, 3, 7, LocalDate.of(2023, 7, 1)},
+            new Object[]{"shirt", "cloth", 10d, 1l, 2023l, 2, 4, 10, LocalDate.of(2023, 10, 1)}
     ));
   }
 
@@ -159,7 +159,7 @@ public abstract class ATestPeriodComparison extends ABaseTestQuery {
             Arrays.asList(2023l, translate(4), "base", -50d, 35d));
     Assertions
             .assertThat(finalTable.headers().stream().map(Header::name))
-            .containsExactlyInAnyOrder(TransactionManager.SCENARIO_FIELD_NAME, period.year(), period.quarter(), "myMeasure", "sum(sales)");
+            .containsExactlyInAnyOrder(DataLoader.SCENARIO_FIELD_NAME, period.year(), period.quarter(), "myMeasure", "sum(sales)");
   }
 
   @Test
@@ -182,7 +182,7 @@ public abstract class ATestPeriodComparison extends ABaseTestQuery {
             Arrays.asList(2023l, "base", 0d, 300d));
     Assertions
             .assertThat(finalTable.headers().stream().map(Header::name))
-            .containsExactlyInAnyOrder(TransactionManager.SCENARIO_FIELD_NAME, period.year(), "myMeasure", "sum(sales)");
+            .containsExactlyInAnyOrder(DataLoader.SCENARIO_FIELD_NAME, period.year(), "myMeasure", "sum(sales)");
 
     // Rollup will make Grand Total and Total appear. For this line, we can't make the comparison. Null should be
     // written and the query should not fail.
@@ -222,7 +222,7 @@ public abstract class ATestPeriodComparison extends ABaseTestQuery {
             Arrays.asList(2023l, translate(2), "base", -60d, 120d));
     Assertions
             .assertThat(finalTable.headers().stream().map(Header::name))
-            .containsExactlyInAnyOrder(TransactionManager.SCENARIO_FIELD_NAME, period.year(), period.semester(), "myMeasure", "sum(sales)");
+            .containsExactlyInAnyOrder(DataLoader.SCENARIO_FIELD_NAME, period.year(), period.semester(), "myMeasure", "sum(sales)");
   }
 
   @Test
@@ -254,7 +254,7 @@ public abstract class ATestPeriodComparison extends ABaseTestQuery {
             Arrays.asList(2023l, translate(12), "base", -5d, 10d));
     Assertions
             .assertThat(finalTable.headers().stream().map(Header::name))
-            .containsExactlyInAnyOrder(TransactionManager.SCENARIO_FIELD_NAME, period.year(), period.month(), "myMeasure", "sum(sales)");
+            .containsExactlyInAnyOrder(DataLoader.SCENARIO_FIELD_NAME, period.year(), period.month(), "myMeasure", "sum(sales)");
   }
 
   @Test

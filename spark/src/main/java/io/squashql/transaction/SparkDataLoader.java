@@ -13,11 +13,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-public class SparkTransactionManager implements TransactionManager {
+public class SparkDataLoader implements DataLoader {
 
   protected final SparkSession spark;
 
-  public SparkTransactionManager(SparkSession spark) {
+  public SparkDataLoader(SparkSession spark) {
     this.spark = spark;
   }
 
@@ -42,13 +42,13 @@ public class SparkTransactionManager implements TransactionManager {
   }
 
   @Override
-  public void load(String scenario, String store, List<Object[]> tuples) {
+  public void load(String scenario, String table, List<Object[]> tuples) {
     // Check the table contains a column scenario.
-    if (!scenario.equals(TransactionManager.MAIN_SCENARIO_NAME)) {
-      ensureScenarioColumnIsPresent(store);
+    if (!scenario.equals(DataLoader.MAIN_SCENARIO_NAME)) {
+      ensureScenarioColumnIsPresent(table);
     }
 
-    boolean addScenario = scenarioColumnIsPresent(store);
+    boolean addScenario = scenarioColumnIsPresent(table);
     List<Row> rows = tuples.stream().map(tuple -> {
       Object[] copy = tuple;
       if (addScenario) {
@@ -60,8 +60,8 @@ public class SparkTransactionManager implements TransactionManager {
 
     Dataset<Row> dataFrame = this.spark.createDataFrame(
             rows,
-            SparkUtil.createSchema(SparkDatastore.getFields(this.spark, store)));// to load pojo
-    appendDataset(this.spark, store, dataFrame);
+            SparkUtil.createSchema(SparkDatastore.getFields(this.spark, table)));// to load pojo
+    appendDataset(this.spark, table, dataFrame);
   }
 
   static void appendDataset(SparkSession spark, String store, Dataset<Row> dataset) {

@@ -3,7 +3,7 @@ package io.squashql.query;
 import io.squashql.PrefetchVisitor;
 import io.squashql.query.QueryCache.SubQueryScope;
 import io.squashql.query.QueryCache.TableScope;
-import io.squashql.query.context.QueryCacheContextValue;
+import io.squashql.query.parameter.QueryCacheParameter;
 import io.squashql.query.database.AQueryEngine;
 import io.squashql.query.database.DatabaseQuery;
 import io.squashql.query.database.QueryEngine;
@@ -20,6 +20,7 @@ import org.eclipse.collections.impl.tuple.Tuples;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,7 +34,7 @@ public class QueryExecutor {
   public final QueryCache queryCache;
 
   public QueryExecutor(QueryEngine<?> queryEngine) {
-    this(queryEngine, new CaffeineQueryCache());
+    this(queryEngine, new GlobalCache(() -> new CaffeineQueryCache()));
   }
 
   public QueryExecutor(QueryEngine<?> queryEngine, QueryCache cache) {
@@ -41,12 +42,12 @@ public class QueryExecutor {
     this.queryCache = cache;
   }
 
-  private QueryCache getQueryCache(QueryCacheContextValue queryCacheContextValue) {
-    return switch (queryCacheContextValue.action) {
+  private QueryCache getQueryCache(QueryCacheParameter queryCacheParameter, SquashQLUser user) {
+    return switch (queryCacheParameter.action) {
       case USE -> this.queryCache;
       case NOT_USE -> EmptyQueryCache.INSTANCE;
       case INVALIDATE -> {
-        this.queryCache.clear(); // FIXME this should be user based.
+        this.queryCache.clear(user);
         yield this.queryCache;
       }
     };
@@ -62,14 +63,16 @@ public class QueryExecutor {
             new QueryWatch(),
             CacheStatsDto.builder(),
             null,
-            true);
+            true,
+            null);
   }
 
   public Table execute(QueryDto query,
                        QueryWatch queryWatch,
                        CacheStatsDto.CacheStatsDtoBuilder cacheStatsDtoBuilder,
                        SquashQLUser user,
-                       boolean replaceTotalCellsAndOrderRows) {
+                       boolean replaceTotalCellsAndOrderRows,
+                       IntConsumer limitNotifier) {
     int queryLimit = query.limit < 0 ? LIMIT_DEFAULT_VALUE : query.limit;
     queryWatch.start(QueryWatch.GLOBAL);
     queryWatch.start(QueryWatch.PREPARE_PLAN);
@@ -100,7 +103,7 @@ public class QueryExecutor {
       DatabaseQuery prefetchQuery = prefetchQueryByQueryScope.get(scope);
       Set<Measure> measures = measuresByQueryScope.get(scope);
       QueryCache.PrefetchQueryScope prefetchQueryScope = createPrefetchQueryScope(scope, prefetchQuery, user);
-      QueryCache queryCache = getQueryCache((QueryCacheContextValue) query.context.getOrDefault(QueryCacheContextValue.KEY, new QueryCacheContextValue(QueryCacheContextValue.Action.USE)));
+      QueryCache queryCache = getQueryCache((QueryCacheParameter) query.parameters.getOrDefault(QueryCacheParameter.KEY, new QueryCacheParameter(QueryCacheParameter.Action.USE)), user);
 
       // Finish to prepare the query
       Set<Measure> cached = new HashSet<>();
@@ -146,7 +149,7 @@ public class QueryExecutor {
     // is given by the graph itself.
     ExecutionPlan<QueryScope, Void> globalPlan = new ExecutionPlan<>(dependencyGraph.getTwo(), (scope, context) -> {
       ExecutionPlan<QueryPlanNodeKey, ExecutionContext> scopedPlan = new ExecutionPlan<>(dependencyGraph.getOne(), new Evaluator(fieldSupplier));
-      scopedPlan.execute(new ExecutionContext(tableByScope.get(scope), scope, tableByScope, query, queryWatch));
+      scopedPlan.execute(new ExecutionContext(tableByScope.get(scope), scope, tableByScope, query, queryLimit, queryWatch));
     });
     globalPlan.execute(null);
 
@@ -155,6 +158,11 @@ public class QueryExecutor {
     queryWatch.start(QueryWatch.ORDER);
 
     Table result = tableByScope.get(queryScope);
+
+    if (limitNotifier != null && result.count() == queryLimit) {
+      limitNotifier.accept(queryLimit);
+    }
+
     result = TableUtils.selectAndOrderColumns((ColumnarTable) result, query);
     if (replaceTotalCellsAndOrderRows) {
       result = TableUtils.replaceTotalCellValues((ColumnarTable) result, !query.rollupColumns.isEmpty());
@@ -164,7 +172,7 @@ public class QueryExecutor {
     queryWatch.stop(QueryWatch.ORDER);
     queryWatch.stop(QueryWatch.GLOBAL);
 
-    CacheStatsDto stats = this.queryCache.stats();
+    CacheStatsDto stats = this.queryCache.stats(user);
     cacheStatsDtoBuilder
             .hitCount(stats.hitCount)
             .evictionCount(stats.evictionCount)
@@ -252,6 +260,7 @@ public class QueryExecutor {
                                  QueryScope queryScope,
                                  Map<QueryScope, Table> tableByScope,
                                  QueryDto query,
+                                 int queryLimit,
                                  QueryWatch queryWatch) {
   }
 
@@ -272,7 +281,10 @@ public class QueryExecutor {
             new QueryWatch(),
             CacheStatsDto.builder(),
             user,
-            false);
+            false,
+            limit -> {
+              throw new RuntimeException("Result of " + q + " is too big (limit=" + limit + ")");
+            });
     CompletableFuture<Table> f1 = CompletableFuture.supplyAsync(() -> execute.apply(first));
     CompletableFuture<Table> f2 = CompletableFuture.supplyAsync(() -> execute.apply(second));
     return CompletableFuture.allOf(f1, f2).thenApply(__ -> merge(f1.join(), f2.join(), joinType, secondComparators, columnSets)).join();

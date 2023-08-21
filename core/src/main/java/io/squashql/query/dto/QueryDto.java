@@ -1,5 +1,6 @@
 package io.squashql.query.dto;
 
+import io.squashql.query.TableField;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
@@ -25,6 +26,11 @@ public class QueryDto {
   public List<String> columns = new ArrayList<>();
 
   public List<String> rollupColumns = new ArrayList<>();
+
+  /**
+   * Internal ONLY! This field is not supposed to be set by the external API and is incompatible with {@link #rollupColumns}
+   */
+  public List<List<String>> groupingSets = new ArrayList<>();
 
   public Map<ColumnSetKey, ColumnSet> columnSets = new LinkedHashMap<>();
 
@@ -84,7 +90,7 @@ public class QueryDto {
     if (this.whereCriteriaDto == null) {
       this.whereCriteriaDto = new CriteriaDto(AND, new ArrayList<>());
     }
-    this.whereCriteriaDto.children.add(new CriteriaDto(field, conditionDto));
+    this.whereCriteriaDto.children.add(new CriteriaDto(new TableField(field), conditionDto));
     return this;
   }
 

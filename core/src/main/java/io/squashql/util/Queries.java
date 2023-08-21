@@ -1,12 +1,14 @@
 package io.squashql.util;
 
+import io.squashql.PrimitiveMeasureVisitor;
 import io.squashql.query.*;
 import io.squashql.query.database.DatabaseQuery;
 import io.squashql.query.dto.*;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static io.squashql.query.dto.OrderKeywordDto.DESC;
 
@@ -35,8 +37,7 @@ public final class Queries {
       BucketColumnSetDto cs = (BucketColumnSetDto) bucket;
       Map<Object, List<Object>> m = new LinkedHashMap<>();
       cs.values.forEach((k, v) -> {
-        List<Object> l = new ArrayList<>();
-        l.addAll(v);
+        List<Object> l = new ArrayList<>(v);
         m.put(k, l);
       });
       res.put(cs.name, new CustomExplicitOrdering(new ArrayList<>(m.keySet())));
@@ -46,8 +47,8 @@ public final class Queries {
     return res;
   }
 
-  public static DatabaseQuery queryScopeToDatabaseQuery(QueryExecutor.QueryScope queryScope, Function<String, Field> fieldSupplier, int limit) {
-    Set<Field> selects = new HashSet<>(queryScope.columns());
+  public static DatabaseQuery queryScopeToDatabaseQuery(QueryExecutor.QueryScope queryScope, Function<String, TypedField> fieldSupplier, int limit) {
+    Set<TypedField> selects = new HashSet<>(queryScope.columns());
     DatabaseQuery prefetchQuery = new DatabaseQuery();
     if (queryScope.tableDto() != null) {
       prefetchQuery.table(queryScope.tableDto());
@@ -56,16 +57,17 @@ public final class Queries {
     } else {
       throw new IllegalArgumentException("A table or sub-query was expected in " + queryScope);
     }
-    prefetchQuery.whereCriteriaDto = queryScope.whereCriteriaDto();
-    prefetchQuery.havingCriteriaDto = queryScope.havingCriteriaDto();
+    prefetchQuery.whereCriteria(queryScope.whereCriteriaDto());
+    prefetchQuery.havingCriteria(queryScope.havingCriteriaDto());
     selects.forEach(prefetchQuery::withSelect);
-    Optional.ofNullable(queryScope.rollupColumns()).ifPresent(r -> r.forEach(prefetchQuery::withRollup));
+    prefetchQuery.rollup(queryScope.rollupColumns());
+    prefetchQuery.groupingSets(queryScope.groupingSets());
     prefetchQuery.limit(limit);
     prefetchQuery.virtualTable(queryScope.virtualTableDto());
     return prefetchQuery;
   }
 
-  public static DatabaseQuery toSubDatabaseQuery(QueryDto query, Function<String, Field> fieldSupplier) {
+  public static DatabaseQuery toSubDatabaseQuery(QueryDto query, Function<String, TypedField> fieldSupplier) {
     if (query.subQuery != null) {
       throw new IllegalArgumentException("sub-query in a sub-query is not supported");
     }
@@ -83,16 +85,11 @@ public final class Queries {
     }
 
     for (Measure measure : query.measures) {
-      if (measure instanceof AggregatedMeasure
-              || measure instanceof ExpressionMeasure
-              || measure instanceof BinaryOperationMeasure) {
+      if (measure.accept(new PrimitiveMeasureVisitor())) {
         continue;
       }
-      throw new IllegalArgumentException("Only "
-              + AggregatedMeasure.class.getSimpleName() + ", "
-              + ExpressionMeasure.class.getSimpleName() + " or "
-              + BinaryOperationMeasure.class.getSimpleName() + " can be used in a sub-query but "
-              + measure + " was provided");
+      throw new IllegalArgumentException("Only measures that can be computed by the underlying database can be used" +
+              " in a sub-query but " + measure + " was provided");
     }
 
     DatabaseQuery prefetchQuery = new DatabaseQuery().table(query.table);
@@ -101,5 +98,16 @@ public final class Queries {
     cols.stream().map(fieldSupplier).forEach(prefetchQuery::withSelect);
     query.measures.forEach(prefetchQuery::withMeasure);
     return prefetchQuery;
+  }
+
+  public static List<TypedField> generateGroupingSelect(DatabaseQuery query) {
+    List<TypedField> selects = new ArrayList<>();
+    selects.addAll(query.rollup);
+    // order matters, this is why a LinkedHashSet is used.
+    selects.addAll(query.groupingSets
+            .stream()
+            .flatMap(Collection::stream)
+            .collect(Collectors.toCollection(LinkedHashSet::new)));
+    return selects;
   }
 }

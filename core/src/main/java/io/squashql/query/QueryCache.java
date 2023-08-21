@@ -1,7 +1,9 @@
 package io.squashql.query;
 
 import io.squashql.query.dto.*;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
+import io.squashql.table.ColumnarTable;
+import io.squashql.table.Table;
 
 import java.util.List;
 import java.util.Set;
@@ -16,27 +18,33 @@ public interface QueryCache {
 
   void contributeToResult(Table result, Set<Measure> measures, PrefetchQueryScope scope);
 
+  /**
+   * Invalidates the cache associated to the given user.
+   *
+   * @param user the user identifier
+   */
   void clear(SquashQLUser user);
 
   /**
-   * For testing purpose only.
+   * Invalidate the whole cache.
    */
   void clear();
 
   CacheStatsDto stats(SquashQLUser user);
 
   record TableScope(TableDto tableDto,
-                    Set<Field> columns,
+                    Set<TypedField> columns,
                     CriteriaDto whereCriteriaDto,
                     CriteriaDto havingCriteriaDto,
-                    List<Field> rollupColumns,
+                    List<TypedField> rollupColumns,
+                    List<List<TypedField>> groupingSets,
                     VirtualTableDto virtualTableDto,
                     SquashQLUser user,
                     int limit) implements PrefetchQueryScope {
   }
 
   record SubQueryScope(QueryDto subQueryDto,
-                       Set<Field> columns,
+                       Set<TypedField> columns,
                        CriteriaDto whereCriteriaDto,
                        CriteriaDto havingCriteriaDto,
                        SquashQLUser user,
@@ -47,7 +55,7 @@ public interface QueryCache {
    * Marker interface.
    */
   interface PrefetchQueryScope {
-    Set<Field> columns();
+    Set<TypedField> columns();
 
     SquashQLUser user();
   }

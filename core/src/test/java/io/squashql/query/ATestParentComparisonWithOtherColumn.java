@@ -3,7 +3,8 @@ package io.squashql.query;
 import io.squashql.TestClass;
 import io.squashql.query.builder.Query;
 import io.squashql.query.dto.QueryDto;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
+import io.squashql.table.Table;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -21,12 +22,12 @@ public abstract class ATestParentComparisonWithOtherColumn extends ABaseTestQuer
   protected String storeName = "store" + getClass().getSimpleName().toLowerCase();
 
   @Override
-  protected Map<String, List<Field>> getFieldsByStore() {
-    Field city = new Field(this.storeName, "city", String.class);
-    Field country = new Field(this.storeName, "country", String.class);
-    Field continent = new Field(this.storeName, "continent", String.class);
-    Field spendingCategory = new Field(this.storeName, "spending_category", String.class);
-    Field amount = new Field(this.storeName, "amount", double.class);
+  protected Map<String, List<TypedField>> getFieldsByStore() {
+    TypedField city = new TypedField(this.storeName, "city", String.class);
+    TypedField country = new TypedField(this.storeName, "country", String.class);
+    TypedField continent = new TypedField(this.storeName, "continent", String.class);
+    TypedField spendingCategory = new TypedField(this.storeName, "spending_category", String.class);
+    TypedField amount = new TypedField(this.storeName, "amount", double.class);
     return Map.of(this.storeName, List.of(city, country, continent, spendingCategory, amount));
   }
 
@@ -71,7 +72,7 @@ public abstract class ATestParentComparisonWithOtherColumn extends ABaseTestQuer
             .build();
 
     Table result = this.executor.execute(query);
-    // Note: contrary to what you might expect, the result here is the same than having List.of("city", "country","continent")
+    // Note: contrary to what you might expect, the result here is the same as having List.of("city", "country","continent")
     // and it is not meant to compute the percent of the grandparent.
     Assertions.assertThat(result).containsExactly(
             Arrays.asList("eu", "france", "lyon", 3.1d, 3.1d / (4d + 3.1d)),

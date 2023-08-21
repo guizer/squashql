@@ -7,7 +7,7 @@
   <parent>
     <groupId>io.squashql</groupId>
     <artifactId>squashql-parent</artifactId>
-    <version>1.1.2-SNAPSHOT</version>
+    <version>1.2.1-SNAPSHOT</version>
   </parent>
 
   <groupId>io.squashql</groupId>
@@ -21,16 +21,17 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.squashql</groupId>
-      <artifactId>squashql-java-client</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
       <version>${spring-boot.version}</version>
     </dependency>
 
+    <dependency>
+      <groupId>io.squashql</groupId>
+      <artifactId>squashql-java-client</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>io.squashql</groupId>
       <artifactId>squashql-js</artifactId>
@@ -39,15 +40,9 @@
     </dependency>
     <dependency>
       <groupId>io.squashql</groupId>
-      <artifactId>squashql-spark</artifactId>
+      <artifactId>squashql-duckdb</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>slf4j-log4j12</artifactId>
-          <groupId>org.slf4j</groupId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.squashql</groupId>

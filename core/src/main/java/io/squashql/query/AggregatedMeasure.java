@@ -4,7 +4,7 @@ import io.squashql.query.database.QueryRewriter;
 import io.squashql.query.database.SQLTranslator;
 import io.squashql.query.database.SqlUtils;
 import io.squashql.query.dto.CriteriaDto;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
 import lombok.*;
 
 import java.util.function.Function;
@@ -18,7 +18,7 @@ public class AggregatedMeasure implements BasicMeasure {
   public String alias;
   @With
   public String expression;
-  public String field;
+  public Field field;
   public String aggregationFunction;
   public CriteriaDto criteria;
 
@@ -27,6 +27,10 @@ public class AggregatedMeasure implements BasicMeasure {
   }
 
   public AggregatedMeasure(@NonNull String alias, @NonNull String field, @NonNull String aggregationFunction, CriteriaDto criteria) {
+    this(alias, new TableField(field), aggregationFunction, criteria);
+  }
+
+  public AggregatedMeasure(@NonNull String alias, @NonNull Field field, @NonNull String aggregationFunction, CriteriaDto criteria) {
     this.alias = alias;
     this.field = field;
     this.aggregationFunction = aggregationFunction;
@@ -34,18 +38,15 @@ public class AggregatedMeasure implements BasicMeasure {
   }
 
   @Override
-  public String sqlExpression(Function<String, Field> fieldProvider, QueryRewriter queryRewriter, boolean withAlias) {
+  public String sqlExpression(Function<String, TypedField> fieldProvider, QueryRewriter queryRewriter, boolean withAlias) {
     String sql;
-    Function<String, Field> fp = MeasureUtils.withFallback(fieldProvider, Number.class);
-    Field f = fp.apply(this.field);
-    String fieldFullName = queryRewriter.getFieldFullName(f);
+    String fieldExpression = this.field.sqlExpression(fieldProvider, queryRewriter);
     if (this.criteria != null) {
+      Function<String, TypedField> fp = MeasureUtils.withFallback(fieldProvider, Number.class);
       String conditionSt = SQLTranslator.toSql(fp, this.criteria, queryRewriter);
-      sql = this.aggregationFunction + "(case when " + conditionSt + " then " + fieldFullName + " end)";
-    } else if (this.field.equals("*")) {
-      sql = this.aggregationFunction + "(*)";
+      sql = this.aggregationFunction + "(case when " + conditionSt + " then " + fieldExpression + " end)";
     } else {
-      sql = this.aggregationFunction + "(" + fieldFullName + ")";
+      sql = this.aggregationFunction + "(" + fieldExpression + ")";
     }
     return withAlias ? SqlUtils.appendAlias(sql, queryRewriter, this.alias) : sql;
   }

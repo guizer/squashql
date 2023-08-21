@@ -1,10 +1,11 @@
 package io.squashql.query.database;
 
 import io.squashql.SparkDatastore;
-import io.squashql.query.ColumnarTable;
+import io.squashql.SparkUtil;
+import io.squashql.table.ColumnarTable;
 import io.squashql.query.Header;
-import io.squashql.query.RowTable;
-import io.squashql.query.Table;
+import io.squashql.table.RowTable;
+import io.squashql.table.Table;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.eclipse.collections.api.tuple.Pair;
@@ -49,7 +50,7 @@ public class SparkQueryEngine extends AQueryEngine<SparkDatastore> {
             (column, name) -> name,
             (column, name) -> datatypeToClass(column.dataType()),
             ds.toLocalIterator(),
-            (i, r) -> r.get(i),
+            (i, r) -> SparkUtil.getTypeValue(r.get(i)),
             this.queryRewriter);
     return new ColumnarTable(
             result.getOne(),

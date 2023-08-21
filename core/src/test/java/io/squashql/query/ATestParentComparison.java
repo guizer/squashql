@@ -3,7 +3,8 @@ package io.squashql.query;
 import io.squashql.TestClass;
 import io.squashql.query.builder.Query;
 import io.squashql.query.dto.QueryDto;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
+import io.squashql.table.Table;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -25,11 +26,11 @@ public abstract class ATestParentComparison extends ABaseTestQuery {
   protected String storeName = "store" + getClass().getSimpleName().toLowerCase();
 
   @Override
-  protected Map<String, List<Field>> getFieldsByStore() {
-    Field city = new Field(this.storeName, "city", String.class);
-    Field country = new Field(this.storeName, "country", String.class);
-    Field continent = new Field(this.storeName, "continent", String.class);
-    Field population = new Field(this.storeName, "population", double.class);
+  protected Map<String, List<TypedField>> getFieldsByStore() {
+    TypedField city = new TypedField(this.storeName, "city", String.class);
+    TypedField country = new TypedField(this.storeName, "country", String.class);
+    TypedField continent = new TypedField(this.storeName, "continent", String.class);
+    TypedField population = new TypedField(this.storeName, "population", double.class);
     return Map.of(this.storeName, List.of(city, country, continent, population));
   }
 
@@ -149,8 +150,8 @@ public abstract class ATestParentComparison extends ABaseTestQuery {
   void testWithCalculatedMeasure() {
     // Note this calculation may look weird but the goal of this test is to make sure we can compute the percent of
     // parent with a measure computed by SquashQL.
-    Measure pop = Functions.sum("population", "population");
-    Measure pop2 = Functions.plus("pop2", Functions.sum("population", "population"), Functions.integer(2));
+    Measure pop = Functions.sum("populationsum", "population");
+    Measure pop2 = Functions.plus("pop2", pop, Functions.integer(2));
     List<String> ancestors = List.of("city", "country", "continent");
     ComparisonMeasureReferencePosition pOp = new ComparisonMeasureReferencePosition("percentOfParent", DIVIDE, pop, ancestors);
     ComparisonMeasureReferencePosition pOp2 = new ComparisonMeasureReferencePosition("percentOfParent2", DIVIDE, pop2, ancestors);

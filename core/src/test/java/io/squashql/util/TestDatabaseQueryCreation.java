@@ -4,7 +4,7 @@ import io.squashql.query.*;
 import io.squashql.query.parameter.Parameter;
 import io.squashql.query.dto.BucketColumnSetDto;
 import io.squashql.query.dto.QueryDto;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -14,7 +14,7 @@ import java.util.function.Function;
 
 public class TestDatabaseQueryCreation {
 
-  private final Function<String, Field> fieldSupplier = Mockito.mock(Function.class);
+  private final Function<String, TypedField> fieldSupplier = Mockito.mock(Function.class);
 
   @Test
   void testNoTable() {
@@ -64,6 +64,6 @@ public class TestDatabaseQueryCreation {
 
     Assertions.assertThatThrownBy(() -> Queries.queryScopeToDatabaseQuery(QueryExecutor.createQueryScope(queryDto, this.fieldSupplier), this.fieldSupplier, -1))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Only AggregatedMeasure, ExpressionMeasure or BinaryOperationMeasure can be used in a sub-query");
+            .hasMessageContaining("Only measures that can be computed by the underlying database can be used in a sub-query");
   }
 }

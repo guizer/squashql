@@ -4,7 +4,8 @@ import io.squashql.TestClass;
 import io.squashql.query.builder.Query;
 import io.squashql.query.dto.Period;
 import io.squashql.query.dto.QueryDto;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
+import io.squashql.table.Table;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -19,16 +20,16 @@ import static io.squashql.transaction.DataLoader.MAIN_SCENARIO_NAME;
  * why it is @{@link Disabled}.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@TestClass(ignore = {TestClass.Type.SPARK, TestClass.Type.BIGQUERY, TestClass.Type.SNOWFLAKE})
+@TestClass(ignore = {TestClass.Type.SPARK, TestClass.Type.BIGQUERY, TestClass.Type.SNOWFLAKE, TestClass.Type.CLICKHOUSE})
 public abstract class ATestDocPeriodComparison extends ABaseTestQuery {
 
   @Override
-  protected Map<String, List<Field>> getFieldsByStore() {
-    Field studentName = new Field("student", "name", String.class);
-    Field test = new Field("student", "test", String.class);
-    Field score = new Field("student", "score", int.class);
-    Field semester = new Field("student", "semester", int.class);
-    Field year = new Field("student", "year", int.class);
+  protected Map<String, List<TypedField>> getFieldsByStore() {
+    TypedField studentName = new TypedField("student", "name", String.class);
+    TypedField test = new TypedField("student", "test", String.class);
+    TypedField score = new TypedField("student", "score", int.class);
+    TypedField semester = new TypedField("student", "semester", int.class);
+    TypedField year = new TypedField("student", "year", int.class);
     return Map.of("student", List.of(studentName, test, score, year, semester));
   }
 

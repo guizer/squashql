@@ -5,7 +5,8 @@ import io.squashql.query.builder.Query;
 import io.squashql.query.database.QueryRewriter;
 import io.squashql.query.database.SqlUtils;
 import io.squashql.query.dto.*;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
+import io.squashql.table.Table;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -29,14 +30,14 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
   protected String storeName = "store" + getClass().getSimpleName().toLowerCase();
 
   @Override
-  protected Map<String, List<Field>> getFieldsByStore() {
-    Field ean = new Field(this.storeName, "ean", String.class);
-    Field eanId = new Field(this.storeName, "eanId", int.class);
-    Field category = new Field(this.storeName, "category", String.class);
-    Field subcategory = new Field(this.storeName, "subcategory", String.class);
-    Field price = new Field(this.storeName, "price", double.class);
-    Field qty = new Field(this.storeName, "quantity", int.class);
-    Field isFood = new Field(this.storeName, "isFood", boolean.class);
+  protected Map<String, List<TypedField>> getFieldsByStore() {
+    TypedField ean = new TypedField(this.storeName, "ean", String.class);
+    TypedField eanId = new TypedField(this.storeName, "eanId", int.class);
+    TypedField category = new TypedField(this.storeName, "category", String.class);
+    TypedField subcategory = new TypedField(this.storeName, "subcategory", String.class);
+    TypedField price = new TypedField(this.storeName, "price", double.class);
+    TypedField qty = new TypedField(this.storeName, "quantity", int.class);
+    TypedField isFood = new TypedField(this.storeName, "isFood", boolean.class);
     return Map.of(this.storeName, List.of(eanId, ean, category, subcategory, price, qty, isFood));
   }
 
@@ -302,14 +303,14 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
   @Test
   void testConditionsNullNotNull() {
     QueryDto query = Query.from(this.storeName)
-            .where(Functions.criterion("subcategory", Functions.isNotNull()))
+            .where(criterion("subcategory", isNotNull()))
             .select(List.of("ean"), List.of(CountMeasure.INSTANCE))
             .build();
     Table table = this.executor.execute(query);
     Assertions.assertThat(table).containsExactly(List.of("cookie", 3l));
 
     query = Query.from(this.storeName)
-            .where(Functions.criterion("subcategory", Functions.isNull()))
+            .where(criterion("subcategory", isNull()))
             .select(List.of("ean"), List.of(CountMeasure.INSTANCE))
             .build();
     table = this.executor.execute(query);
@@ -553,7 +554,7 @@ public abstract class ATestQueryExecutor extends ABaseTestQuery {
                     decimal))
             .build();
     Table result = this.executor.execute(query);
-    Assertions.assertThat(result).containsExactly(List.of(4650d, 4650d, 9900l, 9900d, 100l, 100d));
+    Assertions.assertThat(result).containsExactly(List.of(4650d, 4650d, 9900l, 9900d, 100, 100d));
     Assertions.assertThat(result.headers().stream().map(Header::name).toList())
             .containsExactly("a1", "a2", "b1", "b2", "constant(100)", "constant(100.0)");
   }

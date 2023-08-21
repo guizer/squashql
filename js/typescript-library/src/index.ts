@@ -1,5 +1,3 @@
-import exp = require("constants");
-
 export const PACKAGE = "io.squashql.query."
 
 export {
@@ -12,12 +10,14 @@ export {
 
 export {
   Measure, AggregatedMeasure, ExpressionMeasure, BasicMeasure,
-  sum, min, max, avg, sumIf, countIf, plus, minus, multiply, divide,
+  sum, min, max, avg,
+  sumIf, minIf, maxIf, avgIf, countIf,
+  plus, minus, multiply, divide,
   integer, decimal,
   comparisonMeasureWithPeriod, comparisonMeasureWithBucket, comparisonMeasureWithParent,
   count,
   ComparisonMethod,
-} from './measures'
+} from './measure'
 
 export {
   Condition,
@@ -36,8 +36,12 @@ export {
 } from './parameters'
 
 export {
-  Querier, QueryResult, MetadataResult, StoreMetadata, MetadataItem, SimpleTable
+  Querier, QueryResult, PivotTableQueryResult, MetadataResult, StoreMetadata, MetadataItem, SimpleTable
 } from './querier'
+
+export {
+  PivotConfig, PivotTableQuery
+} from './pivotTableQuery'
 
 export {
   CanAddOrderBy, CanBeBuildQuery, CanStartBuildingJoin, HasCondition, HasJoin,
@@ -45,3 +49,7 @@ export {
   HasTable, CanAddRollup,
   from, fromSubQuery
 } from './queryBuilder'
+
+export {
+  Field, TableField, ConstantField
+} from './field'

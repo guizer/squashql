@@ -4,17 +4,16 @@ import com.google.cloud.bigquery.*;
 import io.squashql.BigQueryDatastore;
 import io.squashql.BigQueryUtil;
 import io.squashql.jackson.JacksonUtil;
-import io.squashql.query.Table;
+import io.squashql.table.RowTable;
+import io.squashql.table.Table;
 import io.squashql.query.*;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
+import io.squashql.table.ColumnarTable;
 import org.eclipse.collections.api.set.primitive.MutableIntSet;
 import org.eclipse.collections.api.tuple.Pair;
 import org.eclipse.collections.impl.set.mutable.primitive.IntHashSet;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -43,11 +42,51 @@ public class BigQueryEngine extends AQueryEngine<BigQueryDatastore> {
           "variance"
   );
 
+  public BigQueryEngine(BigQueryDatastore datastore) {
+    super(datastore, new BigQueryQueryRewriter(datastore.getProjectId(), datastore.getDatasetName()));
+  }
+
   @Override
-  protected String createSqlStatement(DatabaseQuery query) {
+  protected String createSqlStatement(DatabaseQuery query, QueryExecutor.PivotTableContext context) {
     boolean hasRollup = !query.rollup.isEmpty();
     BigQueryQueryRewriter rewriter = (BigQueryQueryRewriter) this.queryRewriter;
-    Function<String, Field> queryFieldSupplier = QueryExecutor.createQueryFieldSupplier(this, query.virtualTableDto);
+    Function<String, TypedField> queryFieldSupplier = QueryExecutor.createQueryFieldSupplier(this, query.virtualTableDto);
+    if (!query.groupingSets.isEmpty()) {
+      // rows = a,b,c; columns = x,y
+      // (a,b,c,x,y)
+      // (a,b,x,y,c)
+      // (a,x,y,b,c)
+      // (x,y,a,b,c)
+      List<TypedField> l = new ArrayList<>(context.getRowFields());
+      l.addAll(context.getColumnFields());
+      List<List<TypedField>> rollups = new ArrayList<>();
+      rollups.add(l);
+      for (int i = 0; i < context.getRowFields().size(); i++) {
+        List<TypedField> copy = new ArrayList<>(context.getRowFields());
+        copy.addAll(i, context.getColumnFields());
+        rollups.add(copy);
+      }
+
+      StringBuilder sb = new StringBuilder();
+      String unionDistinct = " union distinct ";
+
+      for (int i = 0; i < rollups.size(); i++) {
+        DatabaseQuery deepCopy = JacksonUtil.deserialize(JacksonUtil.serialize(query), DatabaseQuery.class);
+        deepCopy.groupingSets = Collections.emptyList();
+        deepCopy.rollup = rollups.get(i);
+
+        boolean isNotLast = i < rollups.size() - 1;
+        if (isNotLast) {
+          deepCopy.limit = -1; // only for the last one.
+        }
+        sb.append(createSqlStatement(deepCopy, null));
+        if (isNotLast) {
+          sb.append(unionDistinct);
+        }
+      }
+      return sb.toString();
+    }
+
     if (!hasRollup) {
       return SQLTranslator.translate(query,
               queryFieldSupplier,
@@ -71,26 +110,26 @@ public class BigQueryEngine extends AQueryEngine<BigQueryDatastore> {
       BigQueryQueryRewriter newRewriter = new BigQueryQueryRewriter(rewriter.projectId, rewriter.datasetName) {
 
         @Override
-        public String select(Field field) {
+        public String select(TypedField field) {
           Function<Object, String> quoter = SQLTranslator.getQuoteFn(field);
           return String.format("coalesce(%s, %s)", qr.select(field),
                   quoter.apply(BigQueryUtil.getNullValue(field.type())));
         }
 
         @Override
-        public String rollup(Field field) {
+        public String rollup(TypedField field) {
           Function<Object, String> quoter = SQLTranslator.getQuoteFn(field);
           return String.format("coalesce(%s, %s)", qr.rollup(field),
                   quoter.apply(BigQueryUtil.getNullValue(field.type())));
         }
 
         @Override
-        public String getFieldFullName(Field f) {
+        public String getFieldFullName(TypedField f) {
           return qr.getFieldFullName(f);
         }
       };
 
-      List<Field> missingColumnsInRollup = new ArrayList<>(query.select);
+      List<TypedField> missingColumnsInRollup = new ArrayList<>(query.select);
       missingColumnsInRollup.removeAll(query.rollup);
       DatabaseQuery deepCopy = JacksonUtil.deserialize(JacksonUtil.serialize(query), DatabaseQuery.class);
       // Missing columns needs to be added at the beginning to have the correct sub-totals
@@ -105,12 +144,12 @@ public class BigQueryEngine extends AQueryEngine<BigQueryDatastore> {
 
   @Override
   protected Table postProcessDataset(Table input, DatabaseQuery query) {
-    if (query.rollup.isEmpty()) {
+    if (query.rollup.isEmpty() && query.groupingSets.isEmpty()) {
       return input;
     }
 
     boolean isPartialRollup = !Set.copyOf(query.select).equals(Set.copyOf(query.rollup));
-    List<Field> missingColumnsInRollup = new ArrayList<>(query.select);
+    List<TypedField> missingColumnsInRollup = new ArrayList<>(query.select);
     missingColumnsInRollup.removeAll(query.rollup);
     Set<String> missingColumnsInRollupSet = missingColumnsInRollup.stream().map(SqlUtils::getFieldFullName).collect(Collectors.toSet());
 
@@ -124,7 +163,7 @@ public class BigQueryEngine extends AQueryEngine<BigQueryDatastore> {
           Object value = columnValues.get(rowIndex);
           if (value == null) {
             baseColumnValues.set(rowIndex, SQLTranslator.TOTAL_CELL);
-            if (isPartialRollup && missingColumnsInRollupSet.contains(h.name())) {
+            if (query.groupingSets.isEmpty() && isPartialRollup && missingColumnsInRollupSet.contains(h.name())) {
               // Partial rollup not supported https://issuetracker.google.com/issues/35905909, we let bigquery compute
               // all totals, and we remove here the extra rows.
               rowIndicesToRemove.add(rowIndex);
@@ -157,10 +196,6 @@ public class BigQueryEngine extends AQueryEngine<BigQueryDatastore> {
             input.headers(),
             input.measures(),
             newValues);
-  }
-
-  public BigQueryEngine(BigQueryDatastore datastore) {
-    super(datastore, new BigQueryQueryRewriter(datastore.getProjectId(), datastore.getDatasetName()));
   }
 
   @Override
@@ -240,7 +275,7 @@ public class BigQueryEngine extends AQueryEngine<BigQueryDatastore> {
     }
 
     @Override
-    public String getFieldFullName(Field f) {
+    public String getFieldFullName(TypedField f) {
       return SqlUtils.getFieldFullName(f.store() == null ? null : tableName(f.store()), fieldName(f.name()));
     }
 

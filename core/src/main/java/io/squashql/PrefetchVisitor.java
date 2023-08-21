@@ -3,7 +3,7 @@ package io.squashql;
 import io.squashql.query.*;
 import io.squashql.query.QueryExecutor.QueryScope;
 import io.squashql.query.dto.QueryDto;
-import io.squashql.store.Field;
+import io.squashql.store.TypedField;
 import org.eclipse.collections.impl.set.mutable.MutableSetFactoryImpl;
 
 import java.util.Collections;
@@ -16,31 +16,35 @@ public class PrefetchVisitor implements MeasureVisitor<Map<QueryScope, Set<Measu
 
   private final QueryDto query;
   private final QueryScope originalQueryScope;
-  private final Function<String, Field> fieldSupplier;
+  private final Function<String, TypedField> fieldSupplier;
 
-  public PrefetchVisitor(QueryDto query, QueryScope originalQueryScope, Function<String, Field> fieldSupplier) {
+  public PrefetchVisitor(QueryDto query, QueryScope originalQueryScope, Function<String, TypedField> fieldSupplier) {
     this.query = query;
     this.originalQueryScope = originalQueryScope;
     this.fieldSupplier = fieldSupplier;
   }
 
-  private Map<QueryScope, Set<Measure>> original() {
+  private Map<QueryScope, Set<Measure>> empty() {
     return Collections.emptyMap();
   }
 
   @Override
   public Map<QueryScope, Set<Measure>> visit(AggregatedMeasure measure) {
-    return original();
+    return empty();
   }
 
   @Override
   public Map<QueryScope, Set<Measure>> visit(ExpressionMeasure measure) {
-    return original();
+    return empty();
   }
 
   @Override
   public Map<QueryScope, Set<Measure>> visit(BinaryOperationMeasure measure) {
-    return Map.of(this.originalQueryScope, MutableSetFactoryImpl.INSTANCE.of(measure.leftOperand, measure.rightOperand));
+    if (new PrimitiveMeasureVisitor().visit(measure)) {
+      return empty();
+    } else {
+      return Map.of(this.originalQueryScope, MutableSetFactoryImpl.INSTANCE.of(measure.leftOperand, measure.rightOperand));
+    }
   }
 
   @Override
@@ -53,11 +57,11 @@ public class PrefetchVisitor implements MeasureVisitor<Map<QueryScope, Set<Measu
 
   @Override
   public Map<QueryScope, Set<Measure>> visit(LongConstantMeasure measure) {
-    return Collections.emptyMap();
+    return empty();
   }
 
   @Override
   public Map<QueryScope, Set<Measure>> visit(DoubleConstantMeasure measure) {
-    return Collections.emptyMap();
+    return empty();
   }
 }
